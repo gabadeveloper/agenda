@@ -1,18 +1,20 @@
 package com.example.agenda.service.impl;
 
 import com.example.agenda.dto.ContatoDTO;
+import com.example.agenda.dto.EnderecoDTO;
 import com.example.agenda.entity.Contato;
 import com.example.agenda.entity.Endereco;
 import com.example.agenda.repository.ContatoRepository;
 import com.example.agenda.repository.EnderecoRepository;
 import com.example.agenda.service.IAgendaService;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Map.Entry;
+import java.util.*;
 
 @Service
 public class AgendaService implements IAgendaService {
@@ -38,6 +40,7 @@ public class AgendaService implements IAgendaService {
                     .nome(contatoDTO.getNome())
                     .email(contatoDTO.getEmail())
                     .telefone(contatoDTO.getTelefone())
+                    .dataNascimento(contatoDTO.getDataNascimento())
                     .enderecoLista(teste)
                     .build();
 
@@ -56,8 +59,10 @@ public class AgendaService implements IAgendaService {
             Contato contatoSalvo = contatoRepository.save(contato);
 
             return ContatoDTO.builder()
+                    .id(contatoSalvo.getId())
                     .nome(contatoSalvo.getNome())
                     .telefone(contatoSalvo.getTelefone())
+                    .dataNascimento(contatoSalvo.getDataNascimento())
                     .enderecoLista(contatoSalvo.getEnderecoLista())
                     .build();
         }
@@ -83,6 +88,42 @@ public class AgendaService implements IAgendaService {
         else{
             return null;
         }
+    }
+
+    @Override
+    public ContatoDTO atualizarContato(UUID id, ContatoDTO contatoDTO) {
+
+        boolean verificarContato = contatoRepository.existsById(id);
+
+        if(!verificarContato){
+            return null;
+        }
+        else{
+            Contato contato = contatoRepository.getReferenceById(id);
+
+            contatoRepository.save(contato);
+
+            return ContatoDTO.builder()
+                    .nome(contato.getNome())
+                    .email(contato.getEmail())
+                    .telefone(contato.getTelefone())
+                    .dataNascimento(contato.getDataNascimento())
+                    .build();
+        }
+
+    }
+
+    @Override
+    public List<Contato> deletarContato(UUID id) {
+        boolean contato = contatoRepository.existsById(id);
+
+        if(contato){
+            contatoRepository.deleteById(id);
+        }
+        else{
+            return null;
+        }
+        return contatoRepository.findAll();
     }
 
 

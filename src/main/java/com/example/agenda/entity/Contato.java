@@ -1,8 +1,10 @@
 package com.example.agenda.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -32,10 +34,12 @@ public class Contato {
     @Column(name = "TELEFONE_CONTATO")
     private String telefone;
 
-    /*
+
     @Column(name = "DATA_DE_NASCIMENTO_CONTATO")
+    @JsonFormat(pattern = "dd/MM/yyyy")
+    @DateTimeFormat(pattern = "dd/MM/yyyy")
     private LocalDate dataNascimento;
-    */
+
 
     @OneToMany(mappedBy = "contato", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
