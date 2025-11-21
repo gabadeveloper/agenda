@@ -11,6 +11,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Controller
@@ -32,10 +33,16 @@ public class AgendaController {
     }
 
     @GetMapping("/buscar")
-    public List<Contato> dizerOi(){
-        return agendaService.buscarContatos();
-    }
+    public ResponseEntity<List<ContatoDTO>> buscarContatosNaLista(){
 
+        List<ContatoDTO> verificarListaDeContatos = agendaService.buscarContatos();
+
+        if(verificarListaDeContatos == null){
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        }
+
+        return new ResponseEntity<List<ContatoDTO>>(verificarListaDeContatos, HttpStatus.OK);
+    }
 
     @GetMapping("/buscar/{id}")
     public ContatoDTO buscarContatoEspecifico(@PathVariable UUID id){

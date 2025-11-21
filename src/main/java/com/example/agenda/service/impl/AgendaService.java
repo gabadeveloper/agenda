@@ -34,14 +34,14 @@ public class AgendaService implements IAgendaService {
             return null;
         }
         else{
-            List<Endereco> teste = new ArrayList<>();
+            List<Endereco> listaEnderecoVazia = new ArrayList<>();
 
             Contato contato = Contato.builder()
                     .nome(contatoDTO.getNome())
                     .email(contatoDTO.getEmail())
                     .telefone(contatoDTO.getTelefone())
                     .dataNascimento(contatoDTO.getDataNascimento())
-                    .enderecoLista(teste)
+                    .enderecoLista(listaEnderecoVazia)
                     .build();
 
             List<Endereco> enderecos = contatoDTO.getEnderecoLista().stream().map(endereco -> {
@@ -53,8 +53,7 @@ public class AgendaService implements IAgendaService {
                         .build();
 
             }).toList();
-
-            teste.addAll(enderecos);
+            listaEnderecoVazia.addAll(enderecos);
 
             Contato contatoSalvo = contatoRepository.save(contato);
 
@@ -69,8 +68,25 @@ public class AgendaService implements IAgendaService {
     }
 
     @Override
-    public List<Contato> buscarContatos() {
-        return contatoRepository.findAll();
+    public List<ContatoDTO> buscarContatos() {
+
+        List<ContatoDTO> listaContatosDTO = contatoRepository.findAll().stream().map(contato ->{
+            return ContatoDTO.builder()
+                    .id(contato.getId())
+                    .nome(contato.getNome())
+                    .email(contato.getEmail())
+                    .telefone(contato.getTelefone())
+                    .dataNascimento(contato.getDataNascimento())
+                    .enderecoLista(contato.getEnderecoLista())
+                    .build();
+        }).toList();
+
+        if(listaContatosDTO.isEmpty()){
+            return null;
+        }
+        else {
+            return listaContatosDTO;
+        }
     }
 
     @Override
@@ -100,6 +116,7 @@ public class AgendaService implements IAgendaService {
         }
         else{
             Contato contato = contatoRepository.getReferenceById(id);
+            List<Endereco> enderecos = contato.getEnderecoLista();
 
             contatoRepository.save(contato);
 

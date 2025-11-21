@@ -11,7 +11,7 @@ public interface IAgendaService {
 
     ContatoDTO criarContato(ContatoDTO contatoDTO);
 
-    List<Contato> buscarContatos();
+    List<ContatoDTO> buscarContatos();
 
     ContatoDTO buscarContato(UUID id);
 
