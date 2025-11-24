@@ -7,13 +7,12 @@ import com.example.agenda.entity.Endereco;
 import com.example.agenda.repository.ContatoRepository;
 import com.example.agenda.repository.EnderecoRepository;
 import com.example.agenda.service.IAgendaService;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.example.agenda.utils.ContatoPatchMapper;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.Map.Entry;
+import java.lang.reflect.Field;
 import java.util.*;
 
 @Service
@@ -25,12 +24,16 @@ public class AgendaService implements IAgendaService {
     @Autowired
     private EnderecoRepository enderecoRepository;
 
+    @Autowired
+    private ContatoPatchMapper mapper;
+
+
     @Override
     public ContatoDTO criarContato(ContatoDTO contatoDTO) {
 
-        Optional<Contato> email = contatoRepository.findByEmail(contatoDTO.getEmail());
+        Optional<Contato> verificarEmail = contatoRepository.findByEmail(contatoDTO.getEmail());
 
-        if(email.isPresent()){
+        if(verificarEmail.isPresent()){
             return null;
         }
         else{
@@ -59,6 +62,7 @@ public class AgendaService implements IAgendaService {
 
             return ContatoDTO.builder()
                     .id(contatoSalvo.getId())
+                    .email(contatoSalvo.getEmail())
                     .nome(contatoSalvo.getNome())
                     .telefone(contatoSalvo.getTelefone())
                     .dataNascimento(contatoSalvo.getDataNascimento())
@@ -93,21 +97,26 @@ public class AgendaService implements IAgendaService {
     public ContatoDTO buscarContato(UUID id) {
         boolean contato = contatoRepository.existsById(id);
 
-        if(contato){
+        if(!contato){
+            return null;
+        }
+        else{
+
             Contato dadosContato = contatoRepository.getReferenceById(id);
             return ContatoDTO.builder()
                     .nome(dadosContato.getNome())
+                    .email(dadosContato.getEmail())
                     .telefone(dadosContato.getTelefone())
+                    .dataNascimento(dadosContato.getDataNascimento())
                     .enderecoLista(dadosContato.getEnderecoLista())
                     .build();
-        }
-        else{
-            return null;
         }
     }
 
     @Override
+    @Transactional
     public ContatoDTO atualizarContato(UUID id, ContatoDTO contatoDTO) {
+
 
         boolean verificarContato = contatoRepository.existsById(id);
 
@@ -116,29 +125,63 @@ public class AgendaService implements IAgendaService {
         }
         else{
             Contato contato = contatoRepository.getReferenceById(id);
-            List<Endereco> enderecos = contato.getEnderecoLista();
+
+            // 1. Carrega a Entidade
+            Contato contatoAtual = contatoRepository.findById(id)
+                    .orElse(null);
+
+            if (contatoAtual == null) {
+                return null;
+            }
+
+            mapper.updateContatoFromDto(contatoDTO, contatoAtual);
+
+            // 3. ATUALIZAÇÃO DINÂMICA DA LISTA DE ENDEREÇOS
+            gerenciarEnderecos(contatoAtual, contatoDTO.getEnderecoLista());
+
+            // 4. Salva (Persiste todas as alterações, incluindo as do MapStruct e da lista)
+            contatoRepository.save(contatoAtual);
+
 
             contatoRepository.save(contato);
 
-            return ContatoDTO.builder()
-                    .nome(contato.getNome())
-                    .email(contato.getEmail())
-                    .telefone(contato.getTelefone())
-                    .dataNascimento(contato.getDataNascimento())
-                    .build();
+            return mapper.toContatoDTO(contatoAtual);
         }
 
     }
+
+
+    private void gerenciarEnderecos(Contato contatoOriginal, List<Endereco> novosEnderecosDTO) {
+
+        // Só processa se a lista foi enviada no DTO (diferente de nulo)
+        if (novosEnderecosDTO != null) {
+
+            // REMOÇÃO DINÂMICA: Limpa a lista existente. (JPA/Hibernate fará o DELETE)
+            contatoOriginal.getEnderecoLista().clear();
+
+            // ADIÇÃO DINÂMICA: Adiciona os novos (ou re-enviados)
+            novosEnderecosDTO.forEach(enderecoDTO -> {
+
+                Endereco enderecoEntity = mapper.toEnderecoEntity(enderecoDTO);
+
+                // CRUCIAL: Vincula a chave estrangeira
+                enderecoEntity.setContato(contatoOriginal);
+
+                contatoOriginal.getEnderecoLista().add(enderecoEntity);
+            });
+        }
+    }
+
 
     @Override
     public List<Contato> deletarContato(UUID id) {
         boolean contato = contatoRepository.existsById(id);
 
-        if(contato){
-            contatoRepository.deleteById(id);
+        if(!contato){
+            return null;
         }
         else{
-            return null;
+            contatoRepository.deleteById(id);
         }
         return contatoRepository.findAll();
     }

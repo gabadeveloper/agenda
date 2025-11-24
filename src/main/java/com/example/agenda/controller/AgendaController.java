@@ -4,6 +4,7 @@ import com.example.agenda.dto.ContatoDTO;
 import com.example.agenda.entity.Contato;
 import com.example.agenda.service.impl.AgendaService;
 import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,7 +23,7 @@ public class AgendaController {
     private AgendaService agendaService;
 
     @PostMapping("/criar")
-    public ResponseEntity<ContatoDTO> criarContato(@RequestBody ContatoDTO contatoDTO){
+    public ResponseEntity<ContatoDTO> criarContato(@Valid @RequestBody ContatoDTO contatoDTO){
 
         ContatoDTO contatoSalvoDto = agendaService.criarContato(contatoDTO);
         if(contatoSalvoDto != null){
@@ -45,8 +46,15 @@ public class AgendaController {
     }
 
     @GetMapping("/buscar/{id}")
-    public ContatoDTO buscarContatoEspecifico(@PathVariable UUID id){
-        return agendaService.buscarContato(id);
+    public ResponseEntity<ContatoDTO> buscarContatoEspecifico(@PathVariable UUID id){
+       ContatoDTO verificarExistenciaContato = agendaService.buscarContato(id);
+       if(verificarExistenciaContato == null){
+           return ResponseEntity.notFound().build();
+       }
+       else{
+           return ResponseEntity.ok(verificarExistenciaContato);
+       }
+
     }
 
     @PatchMapping("/atualizar/{id}")
