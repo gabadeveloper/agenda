@@ -8,13 +8,19 @@ import com.example.agenda.repository.ContatoRepository;
 import com.example.agenda.repository.EnderecoRepository;
 import com.example.agenda.service.IAgendaService;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.BeanWrapper;
+import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.beans.PropertyDescriptor;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Map.Entry;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class AgendaService implements IAgendaService {
@@ -114,9 +120,16 @@ public class AgendaService implements IAgendaService {
         if(!verificarContato){
             return null;
         }
+
         else{
-            Contato contato = contatoRepository.getReferenceById(id);
-            List<Endereco> enderecos = contato.getEnderecoLista();
+            Contato contato = contatoRepository.findById(id).orElse(null);
+
+            if(contatoDTO.getEnderecoLista() != null){
+                atualizarEnderecoLista(contato.getEnderecoLista(), contatoDTO.getEnderecoLista(), contato);
+            }
+
+
+            alterarDados(contatoDTO, contato);
 
             contatoRepository.save(contato);
 
@@ -125,9 +138,82 @@ public class AgendaService implements IAgendaService {
                     .email(contato.getEmail())
                     .telefone(contato.getTelefone())
                     .dataNascimento(contato.getDataNascimento())
+                    .enderecoLista(contato.getEnderecoLista())
                     .build();
         }
 
+    }
+
+    private static void alterarDados(Object origem, Object destino) {
+
+        String[] camposNulos = atributosNulos(origem);
+
+        BeanUtils.copyProperties(origem, destino, camposNulos);
+    }
+
+    private static String[] atributosNulos (Object origem) {
+
+        BeanWrapper wrappedSource = new BeanWrapperImpl(origem);
+        HashSet<String> camposNulos = new HashSet<>();
+
+        for (PropertyDescriptor campo : wrappedSource.getPropertyDescriptors()) {
+            Object valorCampo = wrappedSource.getPropertyValue(campo.getName());
+
+            if (valorCampo == null) camposNulos.add(campo.getName());
+        }
+        String[] campos = new String[camposNulos.size()];
+        return camposNulos.toArray(campos);
+    }
+
+    private void atualizarEnderecoLista(
+            List<Endereco> listaDTO, // CORREÇÃO: Deve ser a lista de DTOs
+            List<Endereco> listaEntidade,
+            Contato contatoPai) // CORREÇÃO: Usar este argumento como o Contato Pai
+    {
+
+        // 1. Prepara as coleções para manipulação
+        Set<UUID> idsManter = new HashSet<>();
+        List<Endereco> novosEnderecos = new ArrayList<>();
+
+        // Mapeia os endereços existentes por ID para busca rápida (Atualização)
+        Map<UUID, Endereco> mapaExistentes = listaEntidade.stream()
+                .filter(e -> e.getId() != null)
+                .collect(Collectors.toMap(Endereco::getId, Function.identity()));
+
+        // 2. Itera sobre o DTO: Criação e Atualização
+        for(Endereco enderecoDTO : listaDTO){
+            if (enderecoDTO.getId() != null){
+                // CASO 1: ATUALIZAÇÃO
+                Endereco enderecoExistente = mapaExistentes.get(enderecoDTO.getId());
+
+                if(enderecoExistente != null){
+                    alterarDados(enderecoDTO, enderecoExistente);
+                    idsManter.add(enderecoDTO.getId()); // Marca para manter
+                }
+            }
+            else{
+                // CASO 2: CRIAÇÃO
+                Endereco novoEndereco = Endereco.builder()
+                        .nomeRua(enderecoDTO.getNomeRua())
+                        .numeroRua(enderecoDTO.getNumeroRua())
+                        .cep(enderecoDTO.getCep())
+                        .contato(contatoPai)
+                        .build();
+                novosEnderecos.add(novoEndereco);
+            }
+        }
+
+        // 3. REMOÇÃO DE ÓRFÃOS (A Lógica Mais Segura)
+        // Usamos removeIf na coleção gerenciada para deletar os órfãos.
+        // O JPA monitora essa chamada e aciona o delete devido ao orphanRemoval=true.
+
+        // Remove qualquer endereço que tenha um ID, mas cujo ID não está na lista 'idsManter'
+        listaEntidade.removeIf(endereco ->
+                endereco.getId() != null && !idsManter.contains(endereco.getId())
+        );
+
+        // 4. Integração: Adiciona os novos endereços
+        listaEntidade.addAll(novosEnderecos);
     }
 
     @Override
