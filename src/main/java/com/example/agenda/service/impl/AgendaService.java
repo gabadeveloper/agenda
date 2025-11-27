@@ -1,13 +1,13 @@
 package com.example.agenda.service.impl;
 
 import com.example.agenda.dto.ContatoDTO;
-import com.example.agenda.dto.EnderecoDTO;
 import com.example.agenda.entity.Contato;
 import com.example.agenda.entity.Endereco;
 import com.example.agenda.repository.ContatoRepository;
 import com.example.agenda.repository.EnderecoRepository;
 import com.example.agenda.service.IAgendaService;
 import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeanWrapper;
 import org.springframework.beans.BeanWrapperImpl;
@@ -15,12 +15,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.beans.PropertyDescriptor;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.Map.Entry;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class AgendaService implements IAgendaService {
@@ -113,6 +111,7 @@ public class AgendaService implements IAgendaService {
     }
 
     @Override
+    @Transactional
     public ContatoDTO atualizarContato(UUID id, ContatoDTO contatoDTO) {
 
         boolean verificarContato = contatoRepository.existsById(id);
@@ -124,14 +123,17 @@ public class AgendaService implements IAgendaService {
         else{
             Contato contato = contatoRepository.findById(id).orElse(null);
 
-            if(contatoDTO.getEnderecoLista() != null){
-                atualizarEnderecoLista(contato.getEnderecoLista(), contatoDTO.getEnderecoLista(), contato);
+            if (contatoDTO.getEnderecoLista() != null) {
+                atualizarEnderecoLista(
+                        contatoDTO.getEnderecoLista(),
+                        contato.getEnderecoLista(),
+                        contato
+                );
             }
-
 
             alterarDados(contatoDTO, contato);
 
-            contatoRepository.save(contato);
+            contato = contatoRepository.save(contato);
 
             return ContatoDTO.builder()
                     .nome(contato.getNome())
@@ -146,73 +148,71 @@ public class AgendaService implements IAgendaService {
 
     private static void alterarDados(Object origem, Object destino) {
 
+        // Obtém a lista de campos que são nulos no DTO (Origem)
         String[] camposNulos = atributosNulos(origem);
 
-        BeanUtils.copyProperties(origem, destino, camposNulos);
+        // Combina os campos nulos com os campos que devem ser sempre protegidos.
+        // Usamos Stream para uma combinação eficiente.
+        String[] camposIgnorar = Stream.of(
+                        // Campos Nulos (para ignorar na atualização parcial)
+                        camposNulos,
+                        // Campos Críticos (para proteger a Entidade Gerenciada)
+                        new String[]{"id", "enderecoLista"}
+                )
+                .flatMap(Arrays::stream)
+                .toArray(String[]::new);
+
+        // Copia as propriedades, ignorando todos os campos listados
+        BeanUtils.copyProperties(origem, destino, camposIgnorar);
     }
 
     private static String[] atributosNulos (Object origem) {
 
-        BeanWrapper wrappedSource = new BeanWrapperImpl(origem);
+        final BeanWrapper wrappedSource = new BeanWrapperImpl(origem);
         HashSet<String> camposNulos = new HashSet<>();
 
         for (PropertyDescriptor campo : wrappedSource.getPropertyDescriptors()) {
-            Object valorCampo = wrappedSource.getPropertyValue(campo.getName());
+            if (wrappedSource.isReadableProperty(campo.getName())) {
+                Object valorCampo = wrappedSource.getPropertyValue(campo.getName());
 
-            if (valorCampo == null) camposNulos.add(campo.getName());
+                if (valorCampo == null) {
+                    camposNulos.add(campo.getName());
+                }
+            }
         }
-        String[] campos = new String[camposNulos.size()];
-        return camposNulos.toArray(campos);
+        // Retorna um array com os nomes dos campos nulos
+        return camposNulos.toArray(new String[0]);
     }
 
-    private void atualizarEnderecoLista(
-            List<Endereco> listaDTO, // CORREÇÃO: Deve ser a lista de DTOs
-            List<Endereco> listaEntidade,
-            Contato contatoPai) // CORREÇÃO: Usar este argumento como o Contato Pai
-    {
-
-        // 1. Prepara as coleções para manipulação
+    private void atualizarEnderecoLista(List<Endereco> listaDTO, List<Endereco> listaEntidade, Contato contato){
         Set<UUID> idsManter = new HashSet<>();
         List<Endereco> novosEnderecos = new ArrayList<>();
 
-        // Mapeia os endereços existentes por ID para busca rápida (Atualização)
-        Map<UUID, Endereco> mapaExistentes = listaEntidade.stream()
+        Map<UUID, Endereco> mapasExistentes = listaEntidade.stream()
                 .filter(e -> e.getId() != null)
                 .collect(Collectors.toMap(Endereco::getId, Function.identity()));
 
-        // 2. Itera sobre o DTO: Criação e Atualização
         for(Endereco enderecoDTO : listaDTO){
-            if (enderecoDTO.getId() != null){
-                // CASO 1: ATUALIZAÇÃO
-                Endereco enderecoExistente = mapaExistentes.get(enderecoDTO.getId());
-
+            if(enderecoDTO.getId() != null){
+                Endereco enderecoExistente = mapasExistentes.get(enderecoDTO.getId());
                 if(enderecoExistente != null){
                     alterarDados(enderecoDTO, enderecoExistente);
-                    idsManter.add(enderecoDTO.getId()); // Marca para manter
+                    idsManter.add(enderecoDTO.getId());
                 }
             }
             else{
-                // CASO 2: CRIAÇÃO
                 Endereco novoEndereco = Endereco.builder()
                         .nomeRua(enderecoDTO.getNomeRua())
                         .numeroRua(enderecoDTO.getNumeroRua())
                         .cep(enderecoDTO.getCep())
-                        .contato(contatoPai)
+                        .contato(contato)
                         .build();
                 novosEnderecos.add(novoEndereco);
             }
         }
 
-        // 3. REMOÇÃO DE ÓRFÃOS (A Lógica Mais Segura)
-        // Usamos removeIf na coleção gerenciada para deletar os órfãos.
-        // O JPA monitora essa chamada e aciona o delete devido ao orphanRemoval=true.
+        listaEntidade.removeIf(endereco -> endereco.getId() != null && !idsManter.contains(endereco.getId()));
 
-        // Remove qualquer endereço que tenha um ID, mas cujo ID não está na lista 'idsManter'
-        listaEntidade.removeIf(endereco ->
-                endereco.getId() != null && !idsManter.contains(endereco.getId())
-        );
-
-        // 4. Integração: Adiciona os novos endereços
         listaEntidade.addAll(novosEnderecos);
     }
 

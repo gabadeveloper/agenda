@@ -4,6 +4,7 @@ import com.example.agenda.entity.Endereco;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
+import org.hibernate.annotations.DynamicUpdate;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
