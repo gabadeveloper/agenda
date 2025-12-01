@@ -6,19 +6,12 @@ import com.example.agenda.entity.Endereco;
 import com.example.agenda.repository.ContatoRepository;
 import com.example.agenda.repository.EnderecoRepository;
 import com.example.agenda.service.IAgendaService;
-import com.fasterxml.jackson.databind.JsonNode;
-import jakarta.transaction.Transactional;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.BeanWrapper;
-import org.springframework.beans.BeanWrapperImpl;
+import com.example.agenda.utils.BeanCopyUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import java.beans.PropertyDescriptor;
 import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+
+import static com.example.agenda.utils.BeanCopyUtils.copiarPropriedadesNaoNulas;
 
 @Service
 public class AgendaService implements IAgendaService {
@@ -28,6 +21,9 @@ public class AgendaService implements IAgendaService {
 
     @Autowired
     private EnderecoRepository enderecoRepository;
+
+    @Autowired
+    private BeanCopyUtils utilitario;
 
     @Override
     public ContatoDTO criarContato(ContatoDTO contatoDTO) {
@@ -111,7 +107,6 @@ public class AgendaService implements IAgendaService {
     }
 
     @Override
-    @Transactional
     public ContatoDTO atualizarContato(UUID id, ContatoDTO contatoDTO) {
 
         boolean verificarContato = contatoRepository.existsById(id);
@@ -121,19 +116,13 @@ public class AgendaService implements IAgendaService {
         }
 
         else{
-            Contato contato = contatoRepository.findById(id).orElse(null);
+            Contato contato = contatoRepository.findById(id).orElseThrow();
 
-            if (contatoDTO.getEnderecoLista() != null) {
-                atualizarEnderecoLista(
-                        contatoDTO.getEnderecoLista(),
-                        contato.getEnderecoLista(),
-                        contato
-                );
-            }
+            copiarPropriedadesNaoNulas(contatoDTO, contato, "enderecoLista");
 
-            alterarDados(contatoDTO, contato);
+            utilitario.atualizarOuAdicionarEnderecos(contato, contatoDTO.getEnderecoLista());
 
-            contato = contatoRepository.save(contato);
+            Contato contatoSalvo = contatoRepository.save(contato);
 
             return ContatoDTO.builder()
                     .nome(contato.getNome())
@@ -144,76 +133,6 @@ public class AgendaService implements IAgendaService {
                     .build();
         }
 
-    }
-
-    private static void alterarDados(Object origem, Object destino) {
-
-        // Obtém a lista de campos que são nulos no DTO (Origem)
-        String[] camposNulos = atributosNulos(origem);
-
-        // Combina os campos nulos com os campos que devem ser sempre protegidos.
-        // Usamos Stream para uma combinação eficiente.
-        String[] camposIgnorar = Stream.of(
-                        // Campos Nulos (para ignorar na atualização parcial)
-                        camposNulos,
-                        // Campos Críticos (para proteger a Entidade Gerenciada)
-                        new String[]{"id", "enderecoLista"}
-                )
-                .flatMap(Arrays::stream)
-                .toArray(String[]::new);
-
-        // Copia as propriedades, ignorando todos os campos listados
-        BeanUtils.copyProperties(origem, destino, camposIgnorar);
-    }
-
-    private static String[] atributosNulos (Object origem) {
-
-        final BeanWrapper wrappedSource = new BeanWrapperImpl(origem);
-        HashSet<String> camposNulos = new HashSet<>();
-
-        for (PropertyDescriptor campo : wrappedSource.getPropertyDescriptors()) {
-            if (wrappedSource.isReadableProperty(campo.getName())) {
-                Object valorCampo = wrappedSource.getPropertyValue(campo.getName());
-
-                if (valorCampo == null) {
-                    camposNulos.add(campo.getName());
-                }
-            }
-        }
-        // Retorna um array com os nomes dos campos nulos
-        return camposNulos.toArray(new String[0]);
-    }
-
-    private void atualizarEnderecoLista(List<Endereco> listaDTO, List<Endereco> listaEntidade, Contato contato){
-        Set<UUID> idsManter = new HashSet<>();
-        List<Endereco> novosEnderecos = new ArrayList<>();
-
-        Map<UUID, Endereco> mapasExistentes = listaEntidade.stream()
-                .filter(e -> e.getId() != null)
-                .collect(Collectors.toMap(Endereco::getId, Function.identity()));
-
-        for(Endereco enderecoDTO : listaDTO){
-            if(enderecoDTO.getId() != null){
-                Endereco enderecoExistente = mapasExistentes.get(enderecoDTO.getId());
-                if(enderecoExistente != null){
-                    alterarDados(enderecoDTO, enderecoExistente);
-                    idsManter.add(enderecoDTO.getId());
-                }
-            }
-            else{
-                Endereco novoEndereco = Endereco.builder()
-                        .nomeRua(enderecoDTO.getNomeRua())
-                        .numeroRua(enderecoDTO.getNumeroRua())
-                        .cep(enderecoDTO.getCep())
-                        .contato(contato)
-                        .build();
-                novosEnderecos.add(novoEndereco);
-            }
-        }
-
-        listaEntidade.removeIf(endereco -> endereco.getId() != null && !idsManter.contains(endereco.getId()));
-
-        listaEntidade.addAll(novosEnderecos);
     }
 
     @Override
