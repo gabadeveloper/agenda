@@ -38,7 +38,7 @@ public class BeanCopyUtils {
         return nomeCampos.toArray(camposNulos);
     }
 
-    public void atualizarOuAdicionarEnderecos(Contato contatoExistente, List<Endereco> enderecosDTO) {
+    public static void atualizarOuAdicionarEnderecos(Contato contatoExistente, List<Endereco> enderecosDTO) {
 
         if (enderecosDTO == null || enderecosDTO.isEmpty()) {
             return;
@@ -66,7 +66,7 @@ public class BeanCopyUtils {
         }
     }
 
-    private void adicionarNovoEndereco(Contato contato, Endereco novoEndereco) {
+    private static void adicionarNovoEndereco(Contato contato, Endereco novoEndereco) {
         if (contato.getEnderecoLista() == null) {
             contato.setEnderecoLista(new java.util.ArrayList<>());
         }

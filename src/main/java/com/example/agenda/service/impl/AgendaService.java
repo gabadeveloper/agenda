@@ -22,9 +22,6 @@ public class AgendaService implements IAgendaService {
     @Autowired
     private EnderecoRepository enderecoRepository;
 
-    @Autowired
-    private BeanCopyUtils utilitario;
-
     @Override
     public ContatoDTO criarContato(ContatoDTO contatoDTO) {
 
@@ -120,7 +117,7 @@ public class AgendaService implements IAgendaService {
 
             copiarPropriedadesNaoNulas(contatoDTO, contato, "enderecoLista");
 
-            utilitario.atualizarOuAdicionarEnderecos(contato, contatoDTO.getEnderecoLista());
+            BeanCopyUtils.atualizarOuAdicionarEnderecos(contato, contatoDTO.getEnderecoLista());
 
             Contato contatoSalvo = contatoRepository.save(contato);
 
