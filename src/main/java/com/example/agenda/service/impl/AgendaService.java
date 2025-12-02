@@ -71,9 +71,7 @@ public class AgendaService implements IAgendaService {
             return ContatoDTO.builder()
                     .id(contato.getId())
                     .nome(contato.getNome())
-                    .email(contato.getEmail())
                     .telefone(contato.getTelefone())
-                    .dataNascimento(contato.getDataNascimento())
                     .enderecoLista(contato.getEnderecoLista())
                     .build();
         }).toList();

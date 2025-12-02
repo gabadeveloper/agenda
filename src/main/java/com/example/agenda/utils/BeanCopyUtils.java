@@ -13,11 +13,9 @@ public class BeanCopyUtils {
     public static void copiarPropriedadesNaoNulas(Object dtoInserido, Object entidadeSalva, String... extraIgnorar) {
         String[] propriedadesNulas = obterPropriedadesNulas(dtoInserido);
 
-        // Combina as propriedades nulas com as propriedades extras a serem ignoradas
         List<String> combinedIgnores = new ArrayList<>(Arrays.asList(propriedadesNulas));
         combinedIgnores.addAll(Arrays.asList(extraIgnorar));
 
-        // Agora, ele ignora nulos E quaisquer campos extras que você passar
         BeanUtils.copyProperties(dtoInserido, entidadeSalva, combinedIgnores.toArray(new String[0]));
     }
 

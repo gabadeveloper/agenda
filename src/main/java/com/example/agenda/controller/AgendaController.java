@@ -26,7 +26,7 @@ public class AgendaController {
 
         ContatoDTO contatoSalvoDto = agendaService.criarContato(contatoDTO);
         if(contatoSalvoDto != null){
-            return ResponseEntity.ok(contatoSalvoDto);
+            return new ResponseEntity<>(contatoSalvoDto, HttpStatus.CREATED);
         }
         return new ResponseEntity<ContatoDTO>(HttpStatus.FOUND);
 
@@ -38,25 +38,30 @@ public class AgendaController {
         List<ContatoDTO> verificarListaDeContatos = agendaService.buscarContatos();
 
         if(verificarListaDeContatos == null){
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
 
         return new ResponseEntity<List<ContatoDTO>>(verificarListaDeContatos, HttpStatus.OK);
     }
 
     @GetMapping("/buscar/{id}")
-    public ContatoDTO buscarContatoEspecifico(@PathVariable UUID id){
-        return agendaService.buscarContato(id);
+    public ResponseEntity<ContatoDTO> buscarContatoEspecifico(@PathVariable UUID id){
+        ContatoDTO verificarExistenciaContato = agendaService.buscarContato(id);
+
+        if(verificarExistenciaContato == null){
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+        return new ResponseEntity<>(verificarExistenciaContato, HttpStatus.OK);
     }
 
     @PatchMapping("/atualizar/{id}")
     public ResponseEntity<ContatoDTO> atualizarContato(@PathVariable UUID id, @RequestBody ContatoDTO contatoDTO){
         ContatoDTO verificar = agendaService.atualizarContato(id, contatoDTO);
         if(verificar == null){
-            return ResponseEntity.notFound().build();
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
         else{
-            return ResponseEntity.ok(verificar);
+            return new ResponseEntity<>(verificar, HttpStatus.OK);
         }
     }
 
@@ -67,7 +72,7 @@ public class AgendaController {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
         else{
-            return new ResponseEntity<>(verificarContato, HttpStatus.OK);
+            return new ResponseEntity<>(verificarContato, HttpStatus.NO_CONTENT);
         }
 
 
