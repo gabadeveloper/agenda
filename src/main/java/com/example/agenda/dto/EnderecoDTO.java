@@ -1,5 +1,6 @@
 package com.example.agenda.dto;
 
+import jakarta.validation.constraints.Pattern;
 import lombok.*;
 import java.util.UUID;
 
